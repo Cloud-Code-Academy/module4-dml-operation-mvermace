@@ -66,8 +66,10 @@ public with sharing class DMLOperations {
         // Create a new Contact instance
         Contact cnt = new Contact();
         // Set some fields on the Contact
-        cnt.FirstName = 'Mike';
-        cnt.LastName = 'Vermace';
+        String fn = 'Mike';
+        String ln = 'Vermace';
+        cnt.FirstName = fn;
+        cnt.LastName = ln;
         // Set the AccountId field to the given accountId
         cnt.AccountId = accountId;
         // Insert the Contact into the database
@@ -136,9 +138,20 @@ public with sharing class DMLOperations {
      */
     public static void upsertOpportunityList(List<Opportunity> opportunities) {
         // Loop through each Opportunity in the list
+        List<Opportunity> upsertOpps = new List<Opportunity>();
+               
+        for (Opportunity opp : opportunities) {
             // Set the Opportunity's Stage to Qualification
             // Set the Opportunity's Close Date to 3 months from today
-            // Set the Opportunity's Amount to 50000
+            // Set the Opportunity's Amount to 50000 
+            opp.StageName = 'Qualification';
+            Integer addDays = 90;
+            Date today = Date.today();
+            opp.CloseDate = today + addDays;
+            opp.Amount = 50000;
+            upsertOpps.add(opp);
+        }
+        upsert upsertOpps;
         // Upsert the opportunities List so that records are either updated or created
     }
 
@@ -153,11 +166,45 @@ public with sharing class DMLOperations {
      * @param oppNames The list of Opportunity names.
      */
     public static void upsertOpportunities(String accountName, List<String> oppNames) {
-        // Loop through each Opportunity name
+       
+        // Create Account sObj instance
+        Account newAcct = new Account();
+        // Set Name to accountName
+        newAcct.Name = accountName;
+        upsert newacct; 
+
+        // Declare a List of Opportunities and *.add() to it.  When full, insert the list -> one DML 
+        List<Opportunity> insertTheOpp = new List<Opportunity>();     
+       
+         // Loop through each Opportunity name
+        for (String oppName : oppNames) {
+            
+            Opportunity newOpp = new Opportunity();          
             // Create an Opportunity with the given name
+            newOpp.Name = oppName;
+            newOpp.AccountId = newAcct.Id;
+            newOpp.CloseDate = Date.today(); // I don't like this.
+            // StageName and CloseDate are required.  But setting the StageName field arbitrarily is risky I think, because IDK if the picklist is restricted.
+            // The next 2 lines work in test but is this safe? 
+            String sname = 'Open'; //Open in not in my Org.
+            newOpp.StageName = sname; 
+            //
+            // This seems safer but a lot of work...found this
+            /*
+            List<String> myPicklist = new List<String>();
+            Schema.DescribeFieldResult StageName = Opportunity.StageName.getDescribe();
+            for (Schema.PicklistEntry f : StageName.getPicklistValues()) {
+                myPicklist.add(f.getLabel());
+            }
+            newOpp.StageName = myPicklist[0];  
+            */
             // Add the Opportunity to the list
+            insertTheOpp.add(newOpp);    
+        }
+        insert insertTheOpp;
     }
-    
+
+     
     /**
      * Question 9
 	 * Upserts an Account with the specified name.
