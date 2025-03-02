@@ -183,13 +183,14 @@ public with sharing class DMLOperations {
             // Create an Opportunity with the given name
             newOpp.Name = oppName;
             newOpp.AccountId = newAcct.Id;
-            newOpp.CloseDate = Date.today(); // I don't like this.
-            // StageName and CloseDate are required.  But setting the StageName field arbitrarily is risky I think, because IDK if the picklist is restricted.
+            newOpp.CloseDate = Date.today().addMonths(3); // I don't like this. Line 147 in test class.  But test passes...hmm. 
+            // StageName and CloseDate are required (don't know why Amount is not also required; line 148).  
+            // But setting the StageName field arbitrarily is risky I think, because IDK if the picklist is restricted.
             // The next 2 lines work in test but is this safe? 
             String sname = 'Open'; //Open in not in my Org.
             newOpp.StageName = sname; 
             //
-            // This seems safer but a lot of work...found this
+            // This seems safer but a lot of work...found this. 
             /*
             List<String> myPicklist = new List<String>();
             Schema.DescribeFieldResult StageName = Opportunity.StageName.getDescribe();
@@ -216,13 +217,24 @@ public with sharing class DMLOperations {
 	public static Account upsertAccount(String accountName) {
 		// Query for the Account
 		List<Account> accounts = [SELECT Id FROM Account WHERE Name = :accountName];
-
-		// if the Account exists, update the description
-
-		// otherwise, create a new Account and set the description
-
-		// Upsert the Account
-		return null;
+        // if the Account exists, update the description
+        String newAccountDesc;
+        // Integer i = accounts.size();
+        // i == 0 ? newAccountDesc = 'New Account' : newAccountDesc = 'Updated Account' ; //Why doesn't this work?  
+        //accounts.size() > 0 ? newAccountDesc = 'Updated Account' : newAccountDesc = 'New Account' ; //Why doesn't this work? 
+        if (accounts.size() > 0 ) {
+            newAccountDesc = 'Updated Account';
+        } else {
+            newAccountDesc = 'New Account';
+        }
+        // otherwise, create a new Account and set the description
+        Account newAccount = new Account();
+        newAccount.Name = accountName; //Must include Name as this is required for Insert side.
+        newAccount.Description = newAccountDesc; 
+       
+        // Upsert the Account
+        upsert newAccount; 
+		return newAccount;
 	}
 
     /**
