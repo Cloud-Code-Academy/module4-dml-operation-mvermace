@@ -145,9 +145,9 @@ public with sharing class DMLOperations {
             // Set the Opportunity's Close Date to 3 months from today
             // Set the Opportunity's Amount to 50000 
             opp.StageName = 'Qualification';
-            Integer addDays = 90;
+            Integer addMonths = 3;
             Date today = Date.today();
-            opp.CloseDate = today + addDays;
+            opp.CloseDate = today.addMonths(addMonths);
             opp.Amount = 50000;
             upsertOpps.add(opp);
         }
@@ -187,7 +187,7 @@ public with sharing class DMLOperations {
             // StageName and CloseDate are required (don't know why Amount is not also required; line 148).  
             // But setting the StageName field arbitrarily is risky I think, because IDK if the picklist is restricted.
             // The next 2 lines work in test but is this safe? 
-            String sname = 'Open'; //Open in not in my Org.
+            String sname = 'Open'; //Open is not in my Org.
             newOpp.StageName = sname; 
             //
             // This seems safer but a lot of work...found this. 
@@ -233,29 +233,76 @@ public with sharing class DMLOperations {
         newAccount.Description = newAccountDesc; 
        
         // Upsert the Account
-        upsert newAccount; 
+        upsert newAccount; // What if this fails?  No checks here.
 		return newAccount;
 	}
 
     /**
      * Question 10
 	 * Manage the association between Contacts and Accounts
-	 * Ensure that for each Contact in the provided list, there is a corresponding Account Name that matches the Contact's last name.
-	 * If such an Account does not exist, the method creates it; if it does, the method ensures the Contact is associated with it. (Hint: use previous upsertAccount method - this may cause bad practices but for learning purposes it's okay.)
+	 * Ensure that for each Contact in the provided list, there is a corresponding Account Name that 
+     * matches the Contact's last name.
+	 * 
+     * If such an Account does not exist, the method creates it; if it does, the method ensures
+     * the Contact is associated with it. (Hint: use previous upsertAccount method - this may cause bad practices but for learning purposes it's okay.)
+     * 
      * Example Contact.LastName = 'Doe' Link to Account.Name = 'Doe' 
      * Example Contact.LastName = 'Jane' Link to Account.Name = 'Jane'
 	 * @param contactsToUpsert List of Contacts to be upserted and linked to accounts.
 	 */
+    //Almost had this!!!
 	public static void upsertAccountsWithContacts(List<Contact> contactsToUpsert) {
-		// Loop through each Contact
+		Set<String> conlnames = new Set<String>();
+        // Loop through each Contact
+        for (Contact c : contactsToUpsert ) {
+            if ( string.isBlank(c.LastName)) {
+                continue;
+            }
+            conlnames.add(c.LastName);
+        }
+		
+        List<Account> existingAccts = [SELECT Id, Name FROM Account WHERE Name IN :conlnames];
 
-		// Extract the Account Name from Contact's LastName
+        Map<String, Id> accNameToAccId_Map = new Map<String, Id>();
+        for (Account a : existingAccts) {
+            if (accNameToAccId_Map.containsKey(a.Name)) {
+                continue;
+            }
+            accNameToAccId_Map.put(a.Name, a.Id);
+        }
 
-		// Get the account based on the name or create one if it doesn't exist
+        List<Account> accToInsert = new List<Account>();
+        for ( String ln : conlnames ) {
+            if (accNameToAccId_Map.containsKey(ln)) {
+                continue;
+            }
+            accToInsert.add(new Account(Name = ln));
+        }
+        
+        List<Database.SaveResult> accSaveResults = Database.insert(accToInsert, false);
+        for(Database.SaveResult sr : accSaveResults) {
+            if(sr.isSuccess()) {
+                continue;
+            }
+            for(Database.Error de : sr.getErrors()) {
+                // TODO: handle errors?!
+                System.debug(JSON.serializePretty(de.getMessage()));
+            }
+        }
 
+        for(Account acc : accToInsert) {
+            if(accNameToAccId_Map.containsKey(acc.Name)) {
+                continue;
+            }
+            accNameToAccId_Map.put(acc.Name, acc.Id);
+        }
 		// Link the Contact to its Account using the Account Id
-
+        for(Contact con : contactsToUpsert) {
+            con.AccountId = accNameToAccId_Map.get(con.LastName);
+        }
 		// Upsert the Contacts
+        Database.upsert(contactsToUpsert);
+	
 	}
 
     /**
@@ -264,12 +311,19 @@ public with sharing class DMLOperations {
      * @param leadNames The list of Lead names to be inserted.
      */
     public static void insertAndDeleteLeads(List<String> leadNames) {
+        List<Lead> listLeads = new List<Lead>();
         // Loop through each Lead name
-
+        for (String s : leadNames) {
+            Lead l = new Lead();
+            l.LastName = s;
+            l.Company = s;
+            listLeads.add(l);
+        }
         // Insert the Leads
-
+        insert listLeads;
         // Delete the Leads
-    }
+        delete listleads;
+    }   
 
 
     /**
@@ -279,8 +333,19 @@ public with sharing class DMLOperations {
      * @param numOfCases The number of cases to create.
      */
     public static void createAndDeleteCases(String accountId, Integer numOfCases) {
+        List<Case> cs = new List<Case>();
+        
+        for ( Integer i = 0; i < numOfCases; i++ ) {
+            Case newCase = new Case();
+            newCase.Subject = 'Mike' + i.toString();
+            newCase.OwnerId = UserInfo.getUserId();
+            newCase.AccountId = accountId;
+            cs.add(newCase);
+        }
+        
         // Insert the cases
-
+        insert cs;
         // Delete the cases
+        delete cs;
     }
 }
