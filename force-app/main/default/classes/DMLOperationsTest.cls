@@ -181,7 +181,7 @@ public with sharing class DMLOperationsTest {
     
         // Retrieve the updated Opportunities from the database
         List<Opportunity> updatedOpps = [SELECT Id, Name FROM Opportunity WHERE AccountId = :retrievedAcc.Id];
-        
+            
         // Assert that the Opportunities were successfully updated
         System.assertEquals(oppNames.size(), updatedOpps.size(), 'The number of updated Opportunities should match the number of Opportunity names provided');
     
